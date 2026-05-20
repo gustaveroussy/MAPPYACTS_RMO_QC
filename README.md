@@ -16,7 +16,6 @@ This repository provides **additional quality controls** on top of the original 
 |---|---|---|
 | Gustave Roussy | Antonin Marchais | antonin.marchais@gustaveroussy.fr |
 | Gustave Roussy | Mathilde Bertrand | mathilde.bertrand@gustaveroussy.fr |
-| Collaboration | Raphael Morscher | raphael.morscher@kispi.uzh.ch |
 | Collaboration | Sarah Cherkaoui | sarah.cherkaoui@gustaveroussy.fr |
 
 ---
