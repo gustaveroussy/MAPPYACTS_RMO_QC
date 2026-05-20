@@ -2,7 +2,6 @@
 Additional quality controls for the MAPPYACTS/MOSCATO cohorts WES data
 
 
-
 ## Context
 
 Reanalysis of the **MAPPYACTS** and **MOSCATO** cohorts using the pipeline described in [Gröbner et al., PMC10157368](https://pmc.ncbi.nlm.nih.gov/articles/PMC10157368/), aligned on hg19 (Sergey's team).
@@ -22,9 +21,22 @@ This repository provides **additional quality controls** on top of the original 
 
 ---
 
-## 📁 Mosdepth
+## Table of Contents
 
-**Callable genome regions** : Genomic intervals where sequencing coverage is sufficient to reliably detect somatic mutations. These regions are used for somatic mutation analyses such as comparing metabolic gene tumor mutational burden (TMB) vs other genes TMB.
+- [Repository Structure](#repository-structure)
+- [Installation](#installation)
+- [Callable Genome Regions](#callable-genome-regions)
+  - [Criteria](#criteria)
+  - [Pipeline](#pipeline)
+  - [Output Format](#output-format)
+  - [Usage](#usage)
+- [PAR Regions Masking Check](#par-regions-masking-check)
+
+
+---
+## Callable genome regions 
+
+Genomic intervals where sequencing coverage is sufficient to reliably detect somatic mutations. These regions are used for somatic mutation analyses such as comparing metabolic gene tumor mutational burden (TMB) vs other genes TMB.
 
 
 ### Criteria
