@@ -1,0 +1,175 @@
+# =============================================================================
+# Pipeline for computing sample-specific callable genomic regions with mosdepth
+#
+# Criteria:
+#   - Restricted to captured target regions (capture BED)
+#   - Restricted to exonic regions (VEP canonical transcripts, GRCh37)
+#   - Tumor coverage >= 20x
+#   - Normal coverage >= 10x
+#
+# Output: callable/{tumor}_{normal}.bed
+#   columns: chrom, start, end, tumor_depth, normal_depth, status (PASS/FAIL)
+# =============================================================================
+
+import os
+import pandas as pd
+
+configfile: "config.yaml"
+
+# ── Config ────────────────────────────────────────────────────────────────────
+CRAM_DIR    = config["cram_dir"]
+CAPTURE_BED = config["capture_bed"]
+EXONS_BED   = config["vep_exons_bed"]
+REF_FASTA   = config["reference_fasta"]
+MOSDEPTH    = config.get("mosdepth", {}).get("app", "mosdepth")
+
+MIN_TUMOR  = config.get("min_tumor_depth",  20)
+MIN_NORMAL = config.get("min_normal_depth", 10)
+
+# ── Sample pairs ──────────────────────────────────────────────────────────────
+annot = pd.read_csv(
+    config["annotation_file"],
+    sep=r"\s+",
+    header=None,
+    names=["tumor", "normal"],
+    comment="#",
+    dtype=str,
+)
+PAIRS  = dict(zip(annot.tumor, annot.normal))
+TUMORS = list(PAIRS.keys())
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+def cram(sample):
+    return os.path.join(CRAM_DIR, f"{sample}.cram")
+
+def crai(sample):
+    return os.path.join(CRAM_DIR, f"{sample}.cram.crai")
+
+
+# =============================================================================
+# RULE ALL
+# =============================================================================
+rule all:
+    input:
+        expand("callable/{tumor}_{normal}.bed",zip, tumor=TUMORS,normal=[PAIRS[t] for t in TUMORS])
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 1. BUILD TARGET REGIONS  (capture ∩ exons, sorted + merged)
+#    Computed once, shared across all samples.
+# ─────────────────────────────────────────────────────────────────────────────
+rule build_target:
+    """Intersect capture BED with VEP exons, sort and merge overlapping intervals."""
+    input:
+        capture = CAPTURE_BED,
+        exons   = EXONS_BED,
+    output:
+        bed = "resources/target_regions.bed",
+    resources:
+        mem_mb   = 4000,
+        time_min = 30
+    log:
+        "logs/build_target.log",
+    shell:
+        """
+        (
+            bedtools intersect -a {input.capture} -b {input.exons} \
+            | bedtools sort -i - \
+            | bedtools merge -i - \
+        ) > {output.bed} 2> {log}
+        """
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 2. MOSDEPTH — per sample
+#    -n / --no-per-base  : skip per-base output (performance)
+#    --fast-mode         : skip low-quality bases (MAPQ > 0); faster, acceptable
+#                          for callable-region calling
+#    -t                  : threads
+#    --by {input.target} : restrict quantification to capture ∩ exon intervals
+#                          (IMPORTANT: do NOT replace with --by 5000 which would
+#                          produce fixed-width windows instead of target regions)
+# ─────────────────────────────────────────────────────────────────────────────
+rule mosdepth:
+    """Run mosdepth over target regions for a single sample (tumor or normal)."""
+    input:
+        cram   = lambda wc: cram(wc.sample),
+        crai   = lambda wc: crai(wc.sample),
+        target = "resources/target_regions.bed",
+    output:
+        regions = "mapping_QC/mosdepth/{sample}.regions.bed.gz",
+        summary = "mapping_QC/mosdepth/{sample}.mosdepth.summary.txt",
+        dist    = "mapping_QC/mosdepth/{sample}.mosdepth.global.dist.txt",
+    params:
+        prefix   = "mapping_QC/mosdepth/{sample}",
+        ref      = REF_FASTA,
+    resources:
+        mem_mb   = 8000,
+        time_min = 120
+    log:
+        "logs/mosdepth/{sample}.log",
+    threads: 4
+    shell:
+        """
+        mosdepth \
+            -n \
+            --fast-mode \
+            -t {threads} \
+            --fasta {params.ref} \
+            --by {input.target} \
+            {params.prefix} \
+            {input.cram} \
+        2> {log}
+        """
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 3. CALLABLE REGIONS — per tumor/normal pair
+#
+#    Strategy: bedtools intersect -wa -wb guarantees row-by-row alignment on
+#    identical intervals (both files were produced from the same target BED),
+#    then awk applies the depth thresholds.
+#
+#    Column layout after intersect -wa -wb:
+#      $1-$4  : tumor  chrom, start, end, depth
+#      $5-$8  : normal chrom, start, end, depth
+# ─────────────────────────────────────────────────────────────────────────────
+rule callable:
+    """
+    Intersect tumor and normal mosdepth outputs and apply depth thresholds.
+
+    Output columns: chrom  start  end  tumor_depth  normal_depth  status
+    status = PASS if tumor >= MIN_TUMOR AND normal >= MIN_NORMAL, else FAIL.
+    """
+    input:
+        tumor  = lambda wc: f"mapping_QC/mosdepth/{wc.tumor}.regions.bed.gz",
+        normal = lambda wc: f"mapping_QC/mosdepth/{PAIRS[wc.tumor]}.regions.bed.gz",
+    output:
+        bed = "callable/{tumor}_{normal}.bed",
+    resources:
+        mem_mb   = 4000,
+        time_min = 30
+    params:
+        min_t = MIN_TUMOR,
+        min_n = MIN_NORMAL,
+    log:
+        "logs/callable/{tumor}_{normal}.log",
+    shell:
+        r"""
+        (
+            # Header
+            echo -e "chrom\tstart\tend\ttumor_depth\tnormal_depth\tstatus"
+
+            # bedtools intersect -wa -wb on identical-interval BEDs is a safe
+            # coordinate-aware join: intervals must match exactly (same target BED).
+            paste <(zcat {input.tumor}) <(zcat {input.normal}) \
+            | awk \
+            -v min_t={params.min_t} \
+            -v min_n={params.min_n} \
+            'BEGIN {{ OFS="\t" }}
+           {{
+           status = ($4 >= min_t && $8 >= min_n) ? "PASS" : "FAIL"
+           print $1, $2, $3, $4, $8, status
+          }}'
+        ) > {output.bed} 2> {log}
+        """

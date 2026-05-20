@@ -1,0 +1,17 @@
+La version VEP utilisé lors de l'annotation est la version 104 (cf /mnt/beegfs01/software_old_centos7/metaprism/wes/external/vep/cache)
+
+wget https://ftp.ensembl.org/pub/grch37/release-104/gtf/homo_sapiens/Homo_sapiens.GRCh37.87.gtf.gz
+
+GTF=/mnt/beegfs01/scratch/ma_bertrand/P025/MOSDEPTH/Homo_sapiens.GRCh37.87.gtf.gz
+
+# bed en filtrant sur les CCDS
+# Le BED est généré à partir du GTF Ensembl GRCh37 en extrayant les coordonnées des exons appartenant aux transcripts CCDS, 
+# qui sont le proxy des transcripts canoniques utilisés par VEP dans cette version.
+
+zcat $GTF \
+| awk '$3 == "exon"' \
+| grep 'ccds_id' \
+| awk 'BEGIN{OFS="\t"} {print $1, $4-1, $5}' \
+| bedtools sort -i - \
+| bedtools merge -i - \
+> vep_canonical_exons_GRCh37.bedhead v
