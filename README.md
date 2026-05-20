@@ -60,7 +60,7 @@ The Snakemake pipeline consists of three main steps:
 ## Repository Structure
 
 ```
-.
+mosdepth/
 ├── env/
 │   └── mosdepth.yaml          # Conda environment
 └── Pipeline/
