@@ -113,3 +113,18 @@ Each output file is a tab-separated BED file with the following columns:
 | `tumor_depth` | Coverage in tumor sample |
 | `normal_depth` | Coverage in normal sample |
 | `status` | `PASS` if both thresholds are met, `FAIL` otherwise |
+
+
+## PAR Regions Masking Check
+
+ 
+Verifies that PAR regions on chromosome Y are masked (`N`) in `human_g1k_v37`, to rule out double-mapping artefacts in CNV analysis.
+ 
+**Run:**
+ 
+```bash
+bash par_masking_check.sh
+```
+ 
+Expected: `ALL N` for chrY PARs, `NOT ALL N` for chrX PARs.
+ 
