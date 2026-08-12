@@ -22,12 +22,12 @@ conda activate /home/ma_bertrand/environnements_conda/mosdepth
 
 
 path_to_configfile="config.yaml"
-path_to_pipeline="/mnt/beegfs01/scratch/ma_bertrand/P025/MOSDEPTH"
+path_to_pipeline="/scratch/ma_bertrand/P025/MOSDEPTH"
 
 
 snakemake --profile profiles/slurm \
 -s ${path_to_pipeline}/snakefile \
---default-resources "tmpdir='/mnt/beegfs01/scratch/ma_bertrand/tmp'" \
+--default-resources "tmpdir='/scratch/ma_bertrand/tmp'" \
 --configfile ${path_to_configfile} \
 
 
