@@ -16,22 +16,22 @@
 #SBATCH --error=xenome_index_%j.err
 
 ### SCRIPT PARAMETERS TO CHANGE ########################################
-INDEXDIR='/mnt/beegfs01/scratch/ma_bertrand/P025/RMO_WES_PDX'
+INDEXDIR='ma_bertrand/P025/RMO_WES_PDX'
 NAME_INDEX='b37_human_g1k_GRCm38_ENSr99_DNA.idx'
 
 # Graft: hg19 (same as for Sergey's pipeline)
-GRAFT_FASTA='/mnt/beegfs01/scratch/ma_bertrand/PEDRESLIP/references/ref/human_g1k_v37.fasta'
+GRAFT_FASTA='ma_bertrand/PEDRESLIP/references/ref/human_g1k_v37.fasta'
 
 # Host: to be downloaded from Ensembl (https more reliable than ftp on cluster)
 WGET_HOST_FASTA='https://ftp.ensembl.org/pub/release-99/fasta/mus_musculus/dna/Mus_musculus.GRCm38.dna.primary_assembly.fa.gz'
 
-XENOME='/mnt/beegfs01/software_old_centos7/xenome/1.0.0_patched/gossamer-1.0.0/build/src/xenome'
+XENOME='/software_old_centos7/xenome/1.0.0_patched/gossamer-1.0.0/build/src/xenome'
 
 
 source /mnt/beegfs02/software/recherche/miniconda/25.1.1/etc/profile.d/conda.sh
 conda activate /home/ma_bertrand/environnements_conda/xenome_env/
 export LD_LIBRARY_PATH=/home/ma_bertrand/environnements_conda/xenome_env/lib:$LD_LIBRARY_PATH
-export TMPDIR=/mnt/beegfs01/scratch/ma_bertrand/tmp
+export TMPDIR=ma_bertrand/tmp
 
 
 ### CODE ################################################################
