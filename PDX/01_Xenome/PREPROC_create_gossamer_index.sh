@@ -60,15 +60,11 @@ wget "${WGET_HOST_FASTA}" -P "${INDEXDIR}"
 
 HOST_FASTA="${INDEXDIR}/$(basename "${WGET_HOST_FASTA}")"
 
-
-
-echo "Adding 'chr' prefix to chromosomes..."
-HOST_FASTA_CHR="${INDEXDIR}/$(basename "${WGET_HOST_FASTA}" .fa.gz)_chr.fa.gz"
-
-zcat "${HOST_FASTA}" | sed 's/^>/>chr/' | gzip > "${HOST_FASTA_CHR}"
-
-rm "${HOST_FASTA}"
-HOST_FASTA="${HOST_FASTA_CHR}"
+#echo "Adding 'chr' prefix to chromosomes..."
+#HOST_FASTA_CHR="${INDEXDIR}/$(basename "${WGET_HOST_FASTA}" .fa.gz)_chr.fa.gz"
+#zcat "${HOST_FASTA}" | sed 's/^>/>chr/' | gzip > "${HOST_FASTA_CHR}"
+#rm "${HOST_FASTA}"
+HOST_FASTA="${HOST_FASTA}"
 
 echo "Building index..."
 "${XENOME}" index \
