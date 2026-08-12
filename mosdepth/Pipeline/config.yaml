@@ -1,25 +1,25 @@
 # ─────────────────────────────────────────────────────────────
 # Reference genome
 # ─────────────────────────────────────────────────────────────
-reference_fasta: "/home/ma_bertrand/Projects/P2025/P25_DBL_PEDRESLIP/REF/human_g1k_v37.fasta"
+reference_fasta: "ma_bertrand/Projects/P2025/P25_DBL_PEDRESLIP/REF/human_g1k_v37.fasta"
 
 # ─────────────────────────────────────────────────────────────
 # Input BED files
 # ─────────────────────────────────────────────────────────────
-capture_bed: "/home/ma_bertrand/Projects/P2025/P25_DBL_PEDRESLIP/BED/captures_ccds_overlap.v37_nochr.bed"
+capture_bed: "ma_bertrand/Projects/P2025/P25_DBL_PEDRESLIP/BED/captures_ccds_overlap.v37_nochr.bed"
 
 # VEP canonical exons (GRCh37 ONLY)
-vep_exons_bed: "/mnt/beegfs01/scratch/ma_bertrand/P025/MOSDEPTH/vep_canonical_exons_GRCh37.bed"
+vep_exons_bed: "/scratch/ma_bertrand/P025/MOSDEPTH/vep_canonical_exons_GRCh37.bed"
 
 # ─────────────────────────────────────────────────────────────
 # CRAM directory
 # ─────────────────────────────────────────────────────────────
-cram_dir: "/mnt/beegfs01/scratch/ma_bertrand/P025/Sarah_mosdepth"
+cram_dir: "/scratch/ma_bertrand/P025/Sarah_mosdepth"
 
 # ─────────────────────────────────────────────────────────────
 # Tumor/Normal pairing file
 # ─────────────────────────────────────────────────────────────
-annotation_file: "/mnt/beegfs01/scratch/ma_bertrand/P025/MOSDEPTH/variant_call_list_TvN.txt"
+annotation_file: "/scratch/ma_bertrand/P025/MOSDEPTH/variant_call_list_TvN.txt"
 
 # ─────────────────────────────────────────────────────────────
 # Coverage thresholds
