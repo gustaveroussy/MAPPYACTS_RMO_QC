@@ -1,0 +1,71 @@
+categories = ["graft", "ambiguous", "both", "neither", "host"]
+samples  = list(config["samples"])
+
+rule all:
+    input:
+        expand(config["base_path"] + "/Xenome/{dataset}/{dataset}_{category}_{read}.fastq.gz",
+               dataset=samples,
+               category=categories,
+               read=["1", "2"]),
+        expand(config["base_path"] + "/Xenome/{dataset}/{dataset}_stats.txt",
+               dataset=samples)
+
+rule xenome_classify:
+    input:
+        r1 = lambda wc: config["samples"][wc.dataset]["r1"],
+        r2 = lambda wc: config["samples"][wc.dataset]["r2"]
+    output:
+        graft_1     = temp(config["base_path"] + "/Xenome/{dataset}/{dataset}_graft_1.fastq"),
+        graft_2     = temp(config["base_path"] + "/Xenome/{dataset}/{dataset}_graft_2.fastq"),
+        host_1      = temp(config["base_path"] + "/Xenome/{dataset}/{dataset}_host_1.fastq"),
+        host_2      = temp(config["base_path"] + "/Xenome/{dataset}/{dataset}_host_2.fastq"),
+        ambiguous_1 = temp(config["base_path"] + "/Xenome/{dataset}/{dataset}_ambiguous_1.fastq"),
+        ambiguous_2 = temp(config["base_path"] + "/Xenome/{dataset}/{dataset}_ambiguous_2.fastq"),
+        both_1      = temp(config["base_path"] + "/Xenome/{dataset}/{dataset}_both_1.fastq"),
+        both_2      = temp(config["base_path"] + "/Xenome/{dataset}/{dataset}_both_2.fastq"),
+        neither_1   = temp(config["base_path"] + "/Xenome/{dataset}/{dataset}_neither_1.fastq"),
+        neither_2   = temp(config["base_path"] + "/Xenome/{dataset}/{dataset}_neither_2.fastq"),
+        stats       = config["base_path"] + "/Xenome/{dataset}/{dataset}_stats.txt"
+    params:
+        name = config["xenome_classify"]["name"],
+        output_dir = config["base_path"] + "/Xenome/{dataset}",
+        prefix     = config["base_path"] + "/Xenome/{dataset}/{dataset}",
+        index      = config["xenome_classify"]["xenome_index"]
+    threads: config["xenome_classify"]["threads"]
+    resources:
+        mem_mb   = config["xenome_classify"]["mem_mb"],
+        time_min = config["xenome_classify"]["time_min"]
+    shell:
+        """
+        mkdir -p {params.output_dir}
+        {params.name} classify \
+        --pairs \
+        -P {params.index} \
+        -i {input.r1} \
+        -i {input.r2} \
+        --output-filename-prefix {params.prefix} \
+        -T {threads} > {output.stats}
+        """
+
+
+rule gzip:
+    input:
+        R1 = config["base_path"] + "/Xenome/{dataset}/{dataset}_{category}_1.fastq",
+        R2 = config["base_path"] + "/Xenome/{dataset}/{dataset}_{category}_2.fastq"
+    output:
+        R1 = config["base_path"] + "/Xenome/{dataset}/{dataset}_{category}_1.fastq.gz",
+        R2 = config["base_path"] + "/Xenome/{dataset}/{dataset}_{category}_2.fastq.gz"
+    wildcard_constraints:
+        category = "graft|host|ambiguous|both|neither"
+    log:
+        config["base_path"] + "/logs/gzip/{dataset}_{category}.log"
+    threads: 4
+    resources:
+        mem_mb   = 500,
+        time_min = 60
+    shell:
+        """
+        pigz -p {threads} -c {input.R1} > {output.R1} 2>> {log}
+        pigz -p {threads} -c {input.R2} > {output.R2} 2>> {log}
+        """
+
