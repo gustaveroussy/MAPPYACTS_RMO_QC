@@ -1,0 +1,286 @@
+---
+title: "link_ncm_to_patients"
+date: "`r format(Sys.Date(), '%d %B %Y')`"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float:
+      collapsed: false
+      smooth_scroll: true
+    theme: cosmo
+    highlight: tango
+    fig_width: 18 
+    fig_height: 14 
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  dpi = 300,
+  echo=FALSE,
+  cache = FALSE,
+  message = FALSE,
+  warning = FALSE
+)
+```
+
+# Introduction 
+
+We checked whether WES (PDX graft + normal WES) and RNAseq FASTQ files (PDX grafts) match the same
+patient, using [NGSCheckMate](https://github.com/parklab/NGSCheckMate).
+
+NGSCheckMate verifies whether sequencing samples come from the same individual. To do this, it compares the allele frequencies (VAF) across a panel of approximately **21,000 SNPs** that are common in the population. Two samples from the same individual have the same genotype at these positions, so their VAFs are highly correlated (close to 0, 0.5, or 1 at the same locations). Two different individuals share only a portion of their genotypes by chance, so the correlation is significantly lower.
+
+
+* For each sample, NGSCheckMate was run in FASTQ mode (ngscheckmate_fastq) with the SNP pattern file, generating one VAF file per sample: WES PDX and RNA-seq PDX samples were processed from Xenome-filtered graft (human) reads to remove mouse contamination, and WES healthy (normal) samples from their raw FASTQ files. 
+* All VAF files (WES PDX, WES healthy and RNA PDX, all patients together) were then aggregated with vaf_ncm.py, which computes pairwise VAF correlations between every pair of samples and classifies each pair as matched or unmatched using a depth-dependent correlation threshold. 
+* The pipeline was run with Snakemake ([Code](https://github.com/gustaveroussy/MAPPYACTS_RMO_QC/tree/main/PDX/00_QC))
+
+# Consitent pairs
+
+Each sample was linked to its patient using the annotation files extracted from ODIN. For each pair of samples, we compared the NGSCheckMate result (matched or unmatched) with what we expected from the metadata (same patient or not). A pair is consistent when both agree.
+
+The table below shows the pairs from the same patient that NGSCheckMate correctly identified as matched : 
+
+```{r cars}
+library(tidyverse)
+library(dplyr)
+library(htmltools)
+
+# ------------------------------------------
+# PARAMETRES
+# ------------------------------------------
+wes_path        <- "C:/Users/ma_bertrand/Desktop/P025/sequenza_investigation_2025/PDX/WES_PDX_annotation.csv"
+rna1_path       <- "C:/Users/ma_bertrand/Desktop/P025/sequenza_investigation_2025/PDX/PDX_Curie.csv"
+rna2_path       <- "C:/Users/ma_bertrand/Desktop/P025/sequenza_investigation_2025/PDX/PDX_GustaveRoussy.csv"
+
+ncm_matched_path <- "C:/Users/ma_bertrand/Desktop/P025/sequenza_investigation_2025/PDX/ngscheckmate/output/output_all.txt"
+out_path        <- "sample_patient_qc.csv"
+
+
+# ------------------------------------------
+# 1. Build a metadata table from wes_path, rna1_path and rna2_path
+#    datasetID | data_type | patient_id | organisation | platform
+# ------------------------------------------
+wes <- read.table(wes_path, header = TRUE, sep = ";", stringsAsFactors = FALSE, check.names = FALSE)
+colnames(wes) <- trimws(colnames(wes))
+  
+
+wes <- wes %>%
+  mutate(sampleType = case_when(
+    sampleType == "xenograft" ~ "WES_PDX",
+    sampleType == "healthy"   ~ "WES_healthy",
+    TRUE ~ NA_character_
+  ))
+  
+wes_clean <- wes %>%
+  rename(
+    datasetID  = datasetId,
+    patient_id = `MAPPYACTS inclusion number`  ) %>%
+  dplyr::select(datasetID, sampleType, patient_id)
+
+
+# --- RNA centre 1 ---
+rna1 <- read.table(rna1_path, header = TRUE, sep = ";", stringsAsFactors = FALSE, check.names = FALSE)
+colnames(rna1) <- trimws(colnames(rna1))
+
+rna1_clean <- data.frame(
+  datasetID    = rna1[["datasetId"]],
+  sampleType    = "xenograft",
+  patient_id   = rna1[["MAPPYACTS inclusion number"]],
+  stringsAsFactors = FALSE
+)
+rna1_clean <- data.frame(
+  datasetID  = rna1[["datasetId"]],
+  sampleType = "RNA_PDX",
+  patient_id = rna1[["MAPPYACTS inclusion number"]],
+  stringsAsFactors = FALSE
+)
+
+# --- RNA centre 2 ---
+rna2 <- read.table(rna2_path, header = TRUE, sep = ";", stringsAsFactors = FALSE, check.names = FALSE)
+colnames(rna2) <- trimws(colnames(rna2))
+rna2_clean <- rna2 %>%
+  rename(datasetID = datasetId) %>%
+  rename(patient_id = `MAPPYACTS inclusion number`) %>%
+  mutate(sampleType = "RNA_PDX") %>%
+  dplyr::select(datasetID, sampleType, patient_id)
+
+
+metadata <- rbind(wes_clean, rna1_clean, rna2_clean)
+metadata$datasetID  <- trimws(as.character(metadata$datasetID))
+metadata$patient_id <- trimws(as.character(metadata$patient_id))
+metadata = unique(metadata)
+
+
+# ------------------------------------------
+# 2. Extract datasetID from NGSCheckMate
+# ------------------------------------------
+
+strip_suffix <- function(sample_name) {
+  sample_name <- sub("_WES_NORMAL$", "", sample_name)
+  sample_name <- sub("_WES$", "", sample_name)
+  sample_name <- sub("_RNA$", "", sample_name)
+  sample_name
+}
+
+
+# ------------------------------------------
+# 3. Link NGSCheckMate results with metadata
+# ------------------------------------------
+ncm <- read.table(
+  ncm_matched_path,
+  header = FALSE,
+  sep = "\t",
+  stringsAsFactors = FALSE,
+  col.names = c("sample1", "status", "sample2", "correlation", "depth")
+)
+
+rename_suffix <- function(x) {
+  x <- sub("_WES_NORMAL$", "_WES_healthy", x, ignore.case = TRUE)
+  x <- sub("_WES$",        "_WES_PDX",     x, ignore.case = TRUE)
+  x <- sub("_RNA$",        "_RNA_PDX",     x, ignore.case = TRUE)
+  x
+}
+
+ncm$sample1 <- rename_suffix(ncm$sample1)
+ncm$sample2 <- rename_suffix(ncm$sample2)
+
+strip_suffix <- function(x) {
+  sub("_(WES_healthy|WES_PDX|RNA_PDX)$", "", x, ignore.case = TRUE)
+}
+
+datasetID_1 <- sapply(ncm$sample1, strip_suffix)
+datasetID_2 <- sapply(ncm$sample2, strip_suffix)
+
+lookup_patient <- setNames(metadata$patient_id, metadata$datasetID)
+lookup_type    <- setNames(metadata$sampleType, metadata$datasetID)
+patient_1 <- ifelse(datasetID_1 %in% names(lookup_patient), lookup_patient[datasetID_1], "UNKNOWN_IN_METADATA")
+patient_2 <- ifelse(datasetID_2 %in% names(lookup_patient), lookup_patient[datasetID_2], "UNKNOWN_IN_METADATA")
+
+type_1 <- ifelse(datasetID_1 %in% names(lookup_type), lookup_type[datasetID_1], "UNKNOWN")
+type_2 <- ifelse(datasetID_2 %in% names(lookup_type), lookup_type[datasetID_2], "UNKNOWN")
+
+same_patient_expected <- (patient_1 == patient_2) & patient_1 != "UNKNOWN_IN_METADATA"
+ncm_says_matched <- ncm$status %in% c(TRUE, "TRUE", "matched")
+consistent <- ncm_says_matched == same_patient_expected
+
+result <- data.frame(
+  sample1 = ncm$sample1,
+  datasetID_1, type_1, patient_1,
+  sample2 = ncm$sample2,
+  datasetID_2, type_2, patient_2,
+  correlation = ncm$correlation,
+  depth = ncm$depth,
+  matched = ncm$status,
+  same_patient_expected,
+  consistent,
+  stringsAsFactors = FALSE
+)
+
+result_consitent = result[result$same_patient_expected=="TRUE",]
+result_consitent = result_consitent[result_consitent$matched=="matched",]
+
+
+# ------------------------------------------
+# 4. Print Datatable
+# ------------------------------------------
+
+col_info <- c(
+  sample1               = "Name of the first sample as reported by NGSCheckMate",
+  datasetID_1           = "Dataset ID of sample 1 (suffix removed)",
+  type_1                = "Data type of sample 1 (WES tumor, WES normal, RNA PDX)",
+  patient_1             = "Patient ID of sample 1 according to metadata",
+  sample2               = "Name of the second sample as reported by NGSCheckMate",
+  datasetID_2           = "Dataset ID of sample 2 (suffix removed)",
+  type_2                = "Data type of sample 2 (WES tumor, WES normal, RNA PDX)",
+  patient_2             = "Patient ID of sample 2 according to metadata",
+  correlation           = "Correlation between the VAF profiles of the two samples",
+  depth                 = "Mean sequencing depth of the pair, used to set the matching threshold",
+  matched               = "NGSCheckMate call: matched (same individual) or unmatched",
+  same_patient_expected = "TRUE if metadata assign both samples to the same patient",
+  consistent            = "TRUE if the NGSCheckMate call agrees with the metadata"
+)
+
+cols <- names(result_consitent)
+
+header <- tags$table(
+  class = "display",
+  tags$thead(tags$tr(
+    lapply(cols, function(n) tags$th(n, title = unname(col_info[n])))
+  ))
+)
+
+
+DT::datatable(
+  result_consitent,
+  container = header,
+  rownames = FALSE,
+  caption = "NGSCheckMate sample-matching QC (hover over column names for details)",
+   extensions = "Buttons",
+  options = list(
+    dom = "Blfrtip",
+    buttons = list(
+      "copy",
+      list(extend = "csv",   filename = "ngscheckmate_qc"),
+      list(extend = "excel", filename = "ngscheckmate_qc")
+    ),
+    pageLength = 10
+))
+```
+
+# Inconsitent pairs
+
+A pair is inconsistent when the NGSCheckMate result does not agree with the metadata: either two samples from the same patient are classified as unmatched, or two samples from different patients are classified as matched. This can indicate a sample swap, but also a technical issue (low depth, RNA-seq data, or a highly rearranged tumor genome).
+
+The table below lists all inconsistent pairs : 
+
+```{r}
+n_inconsistent <- sum(!result$consistent)
+
+DT::datatable(
+  result[!result$consistent, ],
+  container = header,
+  rownames = FALSE,
+  caption = "NGSCheckMate sample-matching QC (hover over column names for details)",
+   extensions = "Buttons",
+  options = list(
+    dom = "Blfrtip",
+    buttons = list(
+      "copy",
+      list(extend = "csv",   filename = "ngscheckmate_qc"),
+      list(extend = "excel", filename = "ngscheckmate_qc")
+    ),
+    pageLength = 10
+))
+```
+
+## Better partnair for inconsitent pairs ?
+
+Looking at the samples involved in inconsistent pairs, 2002762 appears to be the one that does not match well. 
+For each of these samples, we identified the sample with the highest correlation (its best partner). If the best partner belongs to another patient (same_patient = FALSE), the sample may have been swapped.
+
+```{r}
+# Each pair seen from both sides: one row per sample and partner
+pairs_long <- bind_rows(
+  result %>% transmute(sample = sample1, patient = patient_1,
+                       partner = sample2, partner_patient = patient_2,
+                       correlation, depth, status = matched),
+  result %>% transmute(sample = sample2, patient = patient_2,
+                       partner = sample1, partner_patient = patient_1,
+                       correlation, depth, status = matched)
+)
+
+# Best partner of each 2002762 sample
+best_matches <- pairs_long %>%
+  filter(grepl("^2002762_", sample)) %>%
+  group_by(sample) %>%
+  slice_max(correlation, n = 1, with_ties = FALSE) %>%
+  ungroup() %>%
+  mutate(same_patient = patient == partner_patient)
+
+DT::datatable(best_matches, rownames = FALSE)
+```
+
+The best partner of 2002762 is still classified as unmatched: this sample does not match any other sample in the dataset, including samples from its own patient. This is not consistent with a swap with another patient of the cohort, and may reflect a sample from another individual, a contamination, or a technical issue
