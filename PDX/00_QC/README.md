@@ -43,14 +43,19 @@ WES/
   datasetID/
     datasetID_graft_1.fastq.gz
     datasetID_graft_2.fastq.gz
- 
+
+WES_normal/
+  datasetID/
+    datasetID_R1.fastq.gz
+    datasetID_R2.fastq.gz
+
 RNA/
   datasetID/
     datasetID_graft_1.fastq.gz
     datasetID_graft_2.fastq.gz
 ```
  
-Each `datasetID` found under `WES/` and/or `RNA/` is automatically detected by the
+Each `datasetID` found under `WES/`, `WES_normal/` and/or `RNA/` is automatically detected by the
 pipeline — no need to list samples manually.
 
 
@@ -81,3 +86,31 @@ sbatch launch.sh
 ```
 
 
+## Outputs
+ 
+```
+results/
+  vaf/                     # one .vaf file per sample
+  final_results/
+    output_all.txt         # all pairwise comparisons
+    output.pdf     # same in pdf
+    output_corr_matrix.txt # sample x sample correlation matrix
+  logs/                    # one log per rule/sample
+```
+ 
+`output_all.txt` have no header and contain 5 tab-separated columns:
+ 
+| Column | Content |
+|---|---|
+| 1 | Sample 1 |
+| 2 | NGSCheckMate call: `matched` (same individual) or `unmatched` |
+| 3 | Sample 2 |
+| 4 | Correlation between the VAF profiles of the two samples |
+| 5 | Mean sequencing depth of the pair |
+ 
+The matched/unmatched threshold depends on depth: correlations are noisier at low coverage,
+so the threshold is lowered accordingly.
+ 
+## Interpreting the results
+
+Results are compared with the sample annotations in the script `link_ncm_to_patients.Rmd`.
