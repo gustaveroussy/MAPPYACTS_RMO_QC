@@ -24,10 +24,16 @@ This strategy was used in this paper : https://www.nature.com/articles/s41467-02
 ## Requirements
 
 - snakemake/8.28.0
-- A conda environment with NGSCheckMate installed : cf `env.yaml` to install the same environment
+- A conda environment with NGSCheckMate installed : cf `ngscheckmate.yaml` to install the same environment :
+
+```
+conda env create -f ngscheckmate.yaml -n ngscheckmate
+conda activate ngscheckmate
+```
+
 - Access to the NGSCheckMate SNP pattern file (`SNP.pt`), shipped with the package
   (e.g. `<conda_env>/NGSCheckMate/SNP/SNP.pt`)
-- A SLURM cluster profile (or equivalent) for `--profile`
+- A SLURM cluster profile for `--profile`
 
 
 ## Directory structure expected for input data
