@@ -61,20 +61,24 @@ sort -k1,1 -k2,2n ccds_hg19.bed > ccds_hg19_sorted.bed
 module load bedtools/2.28.0
 
 for file in 2191546/SureSelect_Clinical_Research_Exome_Regions_v2_noCHR.bed \
+            2000306/SureSelect_V5.bed \
             captures_ccds_overlap.v37_nochr.bed; do
     grep -v -E '^(track|browser|#)' "$file" \
         | tr -d '\r' \
-        | sort -k1,1 -k2,2n > "${file%.bed}_sorted.bed"
+        | sed 's/^chr//' \
+        | cut -f1-3 \
+        | sort -k1,1 -k2,2n \
+        | bedtools merge -i - > "${file%.bed}_sorted.bed"
 done
 
-
 # ------------------------------------------------------------------------------
-#  4. Keep regions shared by both capture BED files
+#  4. Keep regions shared by all capture BED files
 # ------------------------------------------------------------------------------
 bedtools multiinter -i \
   2191546/SureSelect_Clinical_Research_Exome_Regions_v2_noCHR_sorted.bed \
-  captures_ccds_overlap.v37_nochr_sorted.bed \
-  | awk '$4 >= 2' > regions_all_kits.bed
+  2000306/SureSelect_V5_sorted.bed \
+  captures_ccds_overlap.v37_nochr_sorted.bed \ # bed capture MAPPYACTS (pour compa avec resultats mappyacts)
+  | awk '$4 >= 3' > regions_all_kits.bed
 
 sort -k1,1 -k2,2n regions_all_kits.bed > captures_sort.v37.bed
 
@@ -100,3 +104,7 @@ gatk BedToIntervalList \
   -O hsmetrics_interval.interval_list \
   --SEQUENCE_DICTIONARY /home/a_ivashkin/userdata/references/genome_data/gatk/human_g1k_v37.dict
 
+
+for f in captures_ccds_overlap.v37_nochr_sorted.bed captures_ccds_overlap_pdx.v37.bed; do
+  awk -v f="$f" '{s+=$3-$2} END{printf "%s\t%d intervals\t%.2f Mb\n", f, NR, s/1e6}' "$f"
+done
