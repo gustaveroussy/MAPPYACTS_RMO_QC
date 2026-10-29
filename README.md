@@ -4,7 +4,7 @@ Additional quality controls for the MAPPYACTS/MOSCATO cohorts WES data
 
 ## Context
 
-Reanalysis of the **MAPPYACTS** and **MOSCATO** cohorts using the pipeline described in [Gröbner et al., PMC10157368](https://pmc.ncbi.nlm.nih.gov/articles/PMC10157368/), aligned on hg19 (Sergey's team).
+Reanalysis of the **MAPPYACTS** and **MOSCATO** cohorts using the pipeline described in [Gröbner et al., PMC10157368](https://pmc.ncbi.nlm.nih.gov/articles/PMC10157368/), aligned on hg19 (Sergey's team). (code in : https://github.com/gustaveroussy/gesa-wes-extended/)
 
 This repository provides **additional quality controls** on top of the original pipeline.
 
