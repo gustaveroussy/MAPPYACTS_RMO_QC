@@ -20,110 +20,37 @@ This repository provides **additional quality controls** on top of the original 
 
 ---
 
-## Table of Contents
+ 
+The analysis is organized in three main steps:
+ 
+| Step | Purpose | Tools |
+|------|---------|-------|
+| 1. GESA pipeline *(external)* | Primary processing of the WES data | [GESA](https://github.com/gustaveroussy/gesa-wes-extended) (Sergey's team) |
+| 2. Additional QC | Coverage assessment, callable regions, PAR masking check | mosdepth, custom scripts |
+| 3. PDX analysis | Remove mouse reads, then process RNA-seq and WES | Xenome, nf-core/rnaseq (RNA), GESA (WES) |
 
-- [Repository Structure](#repository-structure)
-- [Installation](#installation)
-- [Callable Genome Regions](#callable-genome-regions)
-  - [Criteria](#criteria)
-  - [Pipeline](#pipeline)
-  - [Output Format](#output-format)
-  - [Usage](#usage)
-- [PAR Regions Masking Check](#par-regions-masking-check)
+ 
+```
+Steps 1-2
+  WES FASTQ ──► GESA pipeline ──► QC (mosdepth, callable regions, PAR check)
+ 
+Step 3 (PDX)
+  PDX FASTQ ──► Xenome (human / mouse) ──► human reads ──┬──► RNA : nf-core/rnaseq
+                                                         └──► WES : GESA pipeline
+```
 
-
----
-## Callable genome regions 
-
-Genomic intervals where sequencing coverage is sufficient to reliably detect somatic mutations. These regions are used for somatic mutation analyses such as comparing metabolic gene tumor mutational burden (TMB) vs other genes TMB.
-
-
-### Criteria
-
-The callable regions are defined based on the following filters:
-
-- Restriction to captured target regions
-- Restriction to exonic regions as defined by the set of canonical transcripts used by VEP (GRCh37)
-- Tumor coverage ≥ 20x
-- Normal coverage ≥ 10x
-
-
-### Pipeline
-
-The Snakemake pipeline consists of three main steps:
-
-1. **Build target regions** — intersect the capture BED with VEP canonical exons, sort and merge overlapping intervals → `resources/target_regions.bed`
-2. **Compute coverage** — run [mosdepth](https://github.com/brentp/mosdepth) over these target regions for each sample (tumor and normal separately) → `mapping_QC/mosdepth/{sample}.regions.bed.gz`
-3. **Generate callable regions** — apply coverage thresholds (≥20x tumor, ≥10x normal) per tumor/normal pair and tag each interval as `PASS` or `FAIL` → `callable/{tumor}_{normal}.bed`
 
 ## Repository Structure
-
+ 
 ```
-mosdepth/
-├── env/
-│   └── mosdepth.yaml          # Conda environment
-└── Pipeline/
-    ├── config.yaml            # Pipeline configuration (paths, thresholds)
-    ├── launch.sh              # SLURM submission script
-    └── Snakefile              # Snakemake pipeline
-```
-
-
-## Installation
-
-Create the conda environment from the provided file:
-
-```bash
-conda env create -f env/mosdepth.yaml
-conda activate mosdepth
+.
+├── README.md
+├── PAR_regions.sh   # PAR regions masking check
+├── mosdepth/              # Coverage QC
+└── PDX/
+    ├── 00_QC/            # NGSCheckMate Snakemake Pipeline
+    ├── 01_Xenome/            # Host/graft classification
+    ├── 02_RNA/            # nf-core/rnaseq configs and samplesheets
+    └── 02_WES/               # Samplesheets / configs to run GESA on Xenome human reads
 ```
 
-Key dependencies:
-
-| Tool | Version |
-|---|---|
-| mosdepth | 0.3.3 |
-| bedtools | 2.31.1 |
-
-## Usage
-
-1. Edit `Pipeline/config.yaml` to set the paths and parameters for your samples.
-
-2. Submit the pipeline to SLURM:
-
-```bash
-cd Pipeline/
-sbatch launch.sh
-```
-
-Logs are written to `job_{jobid}.out` and `job_{jobid}.err`.
-
-> **Note:** Remove `--dryrun` from `launch.sh` to run the pipeline for real.
-
-### Output format
-
-Each output file is a tab-separated BED file with the following columns:
-
-| Column | Description |
-|---|---|
-| `chrom` | Chromosome |
-| `start` | Start position (0-based) |
-| `end` | End position |
-| `tumor_depth` | Coverage in tumor sample |
-| `normal_depth` | Coverage in normal sample |
-| `status` | `PASS` if both thresholds are met, `FAIL` otherwise |
-
-
-## PAR Regions Masking Check
-
- 
-Verifies that PAR regions on chromosome Y are masked (`N`) in `human_g1k_v37`, to rule out double-mapping artefacts in CNV analysis.
- 
-**Run:**
- 
-```bash
-bash par_masking_check.sh
-```
- 
-Expected: `ALL N` for chrY PARs, `NOT ALL N` for chrX PARs.
- 
